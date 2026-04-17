@@ -1,45 +1,18 @@
-# injecter.py
+# inject_graphs.py
 
 import json
-import os
-import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import heapq
 import time
 import math
+import sys
+import os
 from io import BytesIO
 import base64
 
-# --- 1. SMART PATH FINDER ---
-# Ye script Notebook ko automatically dhundhega
-possible_paths = [
-    "Lab_8_Final_Notebook.ipynb",  # Current folder
-    "../Lab_8_Final_Notebook.ipynb",  # 1 step up
-    "../../notebooks/Lab_8_Final_Notebook.ipynb",  # 2 steps up & notebooks (Standard PyCharm structure)
-    "../notebooks/Lab_8_Final_Notebook.ipynb"
-]
 
-notebook_file = None
-for p in possible_paths:
-    if os.path.exists(p):
-        notebook_file = p
-        print(f"✅ Found Notebook at: {notebook_file}")
-        break
-
-if not notebook_file:
-    print("❌ Error: Notebook file not found in standard locations.")
-    print("Please check if 'Lab_8_Final_Notebook.ipynb' exists in your project.")
-    sys.exit(1)
-
-# --- 2. SETUP LOGIC ---
-# Use Agg backend to avoid popups
-import matplotlib
-
-matplotlib.use('Agg')
-from matplotlib.patches import Rectangle, Circle
-
-
+# --- CODE IMPORTS (Everything defined here to run independently) ---
 def heuristic_zero(n, g): return 0.0
 
 
@@ -128,11 +101,6 @@ class HeuristicEvaluator:
             p, e, c = a_star(self.world, self.start, self.goal, h, opt)
             t1 = time.perf_counter()
             if p: exp_list.append(e); time_list.append(t1 - t0)
-
-        # Safety check to avoid RuntimeWarning
-        if not exp_list:
-            return {'heuristic': h.__name__, 'expansions_mean': 0, 'time_mean': 0}
-
         return {'heuristic': h.__name__, 'expansions_mean': np.mean(exp_list), 'time_mean': np.mean(time_list) * 1000}
 
     def compare_all(self):
@@ -140,8 +108,17 @@ class HeuristicEvaluator:
         for k, v in HEURISTICS.items():
             r = self.evaluate_single(v)
             res.append(r)
-            print(f"{k:12} | Exp: {r['expansions_mean']:.0f} | Time: {r['time_mean']:.2f}ms")
         return res
+
+
+# --- GENERATE GRAPHS ---
+
+# Use Agg backend to generate images without popping windows
+import matplotlib
+
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle, Circle
 
 
 def fig_to_base64(fig):
@@ -153,7 +130,7 @@ def fig_to_base64(fig):
     return img_str
 
 
-# --- 3. GENERATE GRAPHS ---
+# 1. Setup Data
 MAZE_SIZE = 15
 START = (0, 0)
 GOAL = (MAZE_SIZE - 1, MAZE_SIZE - 1)
@@ -161,68 +138,72 @@ world = GridWorld.create_maze("default", MAZE_SIZE)
 evaluator = HeuristicEvaluator(world, START, GOAL)
 results = evaluator.compare_all()
 
-# Load Notebook
-with open(notebook_file, 'r') as f:
-    nb = json.load(f)
+# 2. Load Notebook
+notebook_file = "Lab_8_Final_Notebook.ipynb"
 
-# Inject Graph 1: Maze (Cell Index 4)
-try:
-    print("Creating Maze Graph...")
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
-    for x in range(world.width):
-        for y in range(world.height):
-            color = 'black' if (x, y) in world.obstacles else 'white'
-            rect = Rectangle((x, y), 1, 1, facecolor=color, edgecolor='lightgray')
-            ax.add_patch(rect)
-    if START:
-        c = Circle((START[0] + 0.5, START[1] + 0.5), 0.3, fc='green', ec='black')
-        ax.add_patch(c);
-        ax.text(START[0] + 0.5, START[1] + 0.5, 'S', ha='center', va='center', color='white', fontweight='bold')
-    if GOAL:
-        c = Circle((GOAL[0] + 0.5, GOAL[1] + 0.5), 0.3, fc='red', ec='black')
-        ax.add_patch(c);
-        ax.text(GOAL[0] + 0.5, GOAL[1] + 0.5, 'G', ha='center', va='center', color='white', fontweight='bold')
-    ax.set_xlim(0, world.width);
-    ax.set_ylim(0, world.height);
-    ax.set_aspect('equal')
-    plt.title("Lab 8: Default Maze Layout")
+if not os.path.exists(notebook_file):
+    print("Error: Notebook file not found.")
+else:
+    with open(notebook_file, 'r') as f:
+        nb = json.load(f)
 
-    img_maze = fig_to_base64(fig)
-    nb['cells'][4]['outputs'] = [{'data': {'image/png': img_maze}, 'output_type': 'display_data'}]
-except Exception as e:
-    print(f"Error in Maze: {e}")
+    # 3. Inject Graph 1: Maze (Cell Index 4)
+    try:
+        print("Creating Maze Graph...")
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        for x in range(world.width):
+            for y in range(world.height):
+                color = 'black' if (x, y) in world.obstacles else 'white'
+                rect = Rectangle((x, y), 1, 1, facecolor=color, edgecolor='lightgray')
+                ax.add_patch(rect)
+        if START:
+            c = Circle((START[0] + 0.5, START[1] + 0.5), 0.3, fc='green', ec='black')
+            ax.add_patch(c);
+            ax.text(START[0] + 0.5, START[1] + 0.5, 'S', ha='center', va='center', color='white', fontweight='bold')
+        if GOAL:
+            c = Circle((GOAL[0] + 0.5, GOAL[1] + 0.5), 0.3, fc='red', ec='black')
+            ax.add_patch(c);
+            ax.text(GOAL[0] + 0.5, GOAL[1] + 0.5, 'G', ha='center', va='center', color='white', fontweight='bold')
+        ax.set_xlim(0, world.width);
+        ax.set_ylim(0, world.height);
+        ax.set_aspect('equal')
+        plt.title("Lab 8: Default Maze Layout")
 
-# Inject Graph 2: Bar Charts (Cell Index 8)
-try:
-    print("Creating Bar Graphs...")
-    labels = [r['heuristic'].replace('heuristic_', '') for r in results]
-    expansions = [r['expansions_mean'] for r in results]
-    times = [r['time_mean'] for r in results]
+        img_maze = fig_to_base64(fig)
+        nb['cells'][4]['outputs'] = [{'data': {'image/png': img_maze}, 'output_type': 'display_data'}]
+    except Exception as e:
+        print(f"Error in Maze: {e}")
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    # 4. Inject Graph 2: Bar Charts (Cell Index 8)
+    try:
+        print("Creating Bar Graphs...")
+        labels = [r['heuristic'].replace('heuristic_', '') for r in results]
+        expansions = [r['expansions_mean'] for r in results]
+        times = [r['time_mean'] for r in results]
 
-    ax1.bar(labels, expansions, color='skyblue')
-    ax1.set_title('Node Expansions', fontweight='bold')
-    ax1.set_ylabel('Count')
-    for i, v in enumerate(expansions): ax1.text(i, v + 5, str(int(v)), ha='center')
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-    ax2.bar(labels, times, color='orange')
-    ax2.set_title('Execution Time (ms)', fontweight='bold')
-    ax2.set_ylabel('Milliseconds')
-    for i, v in enumerate(times): ax2.text(i, v + 0.1, f"{v:.1f}", ha='center')
+        ax1.bar(labels, expansions, color='skyblue')
+        ax1.set_title('Node Expansions', fontweight='bold')
+        ax1.set_ylabel('Count')
+        for i, v in enumerate(expansions): ax1.text(i, v + 5, str(int(v)), ha='center')
 
-    plt.suptitle('Lab 8 Performance: Muaz Nadeem', fontsize=16)
-    plt.tight_layout()
+        ax2.bar(labels, times, color='orange')
+        ax2.set_title('Execution Time (ms)', fontweight='bold')
+        ax2.set_ylabel('Milliseconds')
+        for i, v in enumerate(times): ax2.text(i, v + 0.1, f"{v:.1f}", ha='center')
 
-    img_bars = fig_to_base64(fig)
-    nb['cells'][8]['outputs'] = [{'data': {'image/png': img_bars}, 'output_type': 'display_data'}]
-except Exception as e:
-    print(f"Error in Bars: {e}")
+        plt.suptitle('Lab 8 Performance: Muaz Nadeem', fontsize=16)
+        plt.tight_layout()
 
-# Save Updated Notebook
-with open(notebook_file, 'w') as f:
-    json.dump(nb, f, indent=2)
+        img_bars = fig_to_base64(fig)
+        nb['cells'][8]['outputs'] = [{'data': {'image/png': img_bars}, 'output_type': 'display_data'}]
+    except Exception as e:
+        print(f"Error in Bars: {e}")
 
-print("✅ SUCCESS! Graphs injected into Notebook.")
-print(f"File saved to: {notebook_file}")
-print("Ab 'git add .' aur 'git push' karein.")
+    # 5. Save Updated Notebook
+    with open(notebook_file, 'w') as f:
+        json.dump(nb, f, indent=2)
+
+    print("✅ SUCCESS! Graphs injected into Notebook.")
+    print("Ab 'git add .' aur 'git push' karein.")
